@@ -1,0 +1,61 @@
+#include <stdint.h>
+
+#define drv8701p_PWM_MAX 10000 // 100.00% pwm
+#define drv8701_PWM_SLEW_RATE 1.0 // Maximum rate of change 1%/ms
+
+static float drv8701p_current_duty = 0; // golabl variable to store the current duty cycle
+static float drv8701p_duty =0;
+
+// Apply pwm command 
+void drv8701p_set_command(float drv8701p_command) {
+
+  drv8701p_duty = drv8701p_command;
+
+  if (drv8701p_duty > 100) {
+    drv8701p_duty = 100;
+  }
+  if (drv8701p_duty < -100) {
+    drv8701p_duty = -100;
+  }
+  }
+
+void drv8701_elapse_1ms() {
+  // Apply pwm slew rate
+  float delta = drv8701p_duty - drv8701p_current_duty;
+  if (delta > drv8701_PWM_SLEW_RATE)
+  {
+    drv8701p_current_duty += drv8701_PWM_SLEW_RATE;
+  }
+  else if (delta < -drv8701_PWM_SLEW_RATE)
+  {
+    drv8701p_current_duty -= drv8701_PWM_SLEW_RATE;
+  }
+  else
+  {
+    drv8701p_current_duty = drv8701p_duty;
+  }
+
+  uint16_t pwm =(drv8701p_current_duty/100) * drv8701p_PWM_MAX;
+  hal_aio_set_output(HAL_AIO_nSLEEP, 1);
+
+  // Apply low-side slow decay during off portion of each PWM cycle
+  if (drv8701p_current_duty > 0)
+  {
+    hal_aio_set_output(HAL_AIO_IN1, pwm);
+    hal_aio_set_output(HAL_AIO_IN2, 0);
+  }
+  else if (drv8701p_current_duty < 0)
+  {
+    hal_aio_set_output(HAL_AIO_IN1, 0);
+    hal_aio_set_output(HAL_AIO_IN2, pwm);
+  }
+  // Apply brake when command is zero
+  else if (drv8701p_current_duty == 0)
+  {
+    hal_aio_set_output(HAL_AIO_IN1, 1);
+    hal_aio_set_output(HAL_AIO_IN2, 1);
+  }
+
+}
+
+
